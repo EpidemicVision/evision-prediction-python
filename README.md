@@ -11,4 +11,7 @@
 4. Create a copy of `.env.example`. Rename it to `.env`. Update the variables accordingly
 
 ## Start
+**_NOTE:_**  If running for the first time, call `influenza_data_scraper::scrape_cdc_trends_data()` to seed data
+
+To run server:
 `streamlit run evision/app.py`
