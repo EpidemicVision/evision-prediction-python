@@ -8,7 +8,8 @@
   pip3 install -r evision/requirements.txt
   pip3 install -r evision/requirements-dev.txt
   ```
-4. Create a copy of `.env.example`. Rename it to `.env`. Update the variables accordingly
+4. Install pre-commit hooks `pre-commit install`
+5. Create a copy of `.env.example`. Rename it to `.env`. Update the variables accordingly
 
 ## Start
 **_NOTE:_**  If running for the first time, call `influenza_data_scraper::scrape_cdc_trends_data()` to seed data
