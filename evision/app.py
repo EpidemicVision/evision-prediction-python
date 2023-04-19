@@ -172,6 +172,33 @@ if disease == INFLUENZA:
             st.metric(
                 "**Confidence interval**", f'{response.get("confidence_interval"):.5f}'
             )
+            history = response.get("history")
+            # print(history.history["loss"])
+
+            st.header("Epoch-Loss Graph")
+            df = pd.DataFrame(
+                {
+                    "loss": history.history["loss"],
+                }
+            )
+
+            df["epoch"] = range(1, epochs + 1)
+            fig = go.Figure()
+            fig.add_trace(
+                go.Line(
+                    name="Loss",
+                    x=df["epoch"],
+                    y=df["loss"],
+                )
+            )
+            fig.update_layout(
+                xaxis={"title": "Epoch"},
+                yaxis={"title": "Loss"},  # 'tickformat':'.2e'},
+                title="Epoch</b>VS</b>Loss",
+                title_x=0.5,
+            )
+            st.plotly_chart(fig, theme=None, use_container_width=True)
+
 
 
 # if terms
