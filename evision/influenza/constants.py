@@ -1,7 +1,7 @@
 from decouple import config
 import os
 
-PROJECT_ROOT = config("PROJECT_ROOT")
+PROJECT_ROOT = config("PROJECT_ROOT", default=os.environ.get("PROJECT_ROOT"))
 INFLUENZA_DATA_DIR = os.path.join(
     PROJECT_ROOT, "evision", "influenza", "data"
 )  # where all the datasets related to influenza should reside

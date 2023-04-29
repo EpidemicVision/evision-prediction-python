@@ -10,3 +10,5 @@ scikit-learn
 tensorflow
 plotly==5.13.1
 python-decouple
+psycopg2-binary
+SQLAlchemy==1.4.4

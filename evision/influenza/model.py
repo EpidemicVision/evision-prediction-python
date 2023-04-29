@@ -11,6 +11,13 @@ from evision.influenza.constants import (
 from pathlib import Path
 from evision.app_logger import setup_logger
 from typing import Dict, Any, List
+import pandas as pd
+import psycopg2 as pg
+from sqlalchemy import create_engine
+from decouple import config
+import os
+import streamlit as st
+
 
 logging = setup_logger(__name__)
 
@@ -21,21 +28,45 @@ def smape(a, f):
     return 1 / len(a) * np.sum(2 * np.abs(f - a) / (np.abs(a) + np.abs(f)) * 100)
 
 
-# def scrape_data(terms, area, time, level, states='all'):
-#     google_trends_data = os.path.join(DATA_DIR, "google_trends.csv")
-#     # ilinet_data = os.path.join(DATA_DIR, f"ILINet__{level}__{states}.csv")
-#     try:
-#         trends_scraper(google_trends_data, terms, area, time)
-#     except Exception as ex:
-#         logging.exception("Failed to scrape trends_scraper data")
-#     try:
-#         cdcwho(DATA_DIR, level, states)
-#     except Exception as ex:
-#         logging.exception("Failed to scrape cdcwho data")
+@st.cache_data
+def get_db_engine():
+    engine = pg.connect(config('DB_URL', default=os.environ.get("DB_URL")))
+    return engine
 
+def fetch_data_from_db(terms: List, level: str, states: str = None) -> pd.DataFrame:
+    engine = pg.connect(config('DB_URL', default=os.environ.get("DB_URL")))
+    if level == "National":
+        trends_df = pd.read_sql("select date, cough, flu, tamiflu, sore_throat, week_number, year from influenza_gtrends WHERE level='National' ORDER BY year DESC, week_number DESC LIMIT 260", con=engine)
+        ilinet_df = pd.read_sql("select * from influenza_ilinet WHERE region_type='National' ORDER BY year DESC, week DESC LIMIT 260", con=engine)
+    else:
+        trends_df = pd.read_sql(f"select date, cough, flu, tamiflu, sore_throat, week_number, year from influenza_gtrends WHERE state='{states}' ORDER BY year DESC, week_number DESC LIMIT 260", con=engine)
+        ilinet_df = pd.read_sql(f"select * from influenza_ilinet WHERE region='{states}' ORDER BY year DESC, week DESC LIMIT 260", con=engine)
 
-# @st.cache_data
+    ilinet_df.drop(
+        ilinet_df.loc[ilinet_df["ilitotal"].isnull()].index, axis=0, inplace=True
+    )
+    terms.extend(["date", "week_number", "year"])
+    terms = ['sore_throat' if term == 'sore throat' else term for term in terms]        
+    trends_df = trends_df[terms]
+    df = pd.merge(
+        trends_df,
+        ilinet_df.loc[:, ["year", "week", "ilitotal"]],
+        left_on=["year", "week_number"],
+        right_on=["year", "week"],
+        how="inner",
+    ).drop(columns=["week_number", "year", "year", "week"])
+    logging.info(f"Combined data: {df.shape}")
+    return df
+
 def fetch_data(terms: List, level: str, states: str = None) -> pd.DataFrame:
+    try:
+        return fetch_data_from_db(terms, level, states)
+    except Exception as ex:
+        print("----- failed to fetch from db ------")
+        print(ex)
+        return fetch_data_from_csv(terms, level, states)
+
+def fetch_data_from_csv(terms: List, level: str, states: str = None) -> pd.DataFrame:
     """
     Currently the method scrapes the data on demand based
     on the params; and returns a df.
@@ -67,7 +98,9 @@ def fetch_data(terms: List, level: str, states: str = None) -> pd.DataFrame:
         how="inner",
     ).drop(columns=["week_number", "year", "YEAR", "WEEK"])
     logging.info(f"Combined data: {df.shape}")
+    df = df.rename(columns={'ILITOTAL':'ilitotal'})
     return df
+
 
 
 # @st.cache_data
@@ -77,7 +110,7 @@ def influenza_train_and_predict(
     dates = data["date"].to_list()
     data.drop(columns=["date"], inplace=True)
     data = data.astype(float)
-    pred_col = "ILITOTAL"
+    pred_col = "ilitotal"
     batch_size = 256
     X, y = data.iloc[:-predict_ahead_by, :].copy(deep=True), data.iloc[
         predict_ahead_by:, :
